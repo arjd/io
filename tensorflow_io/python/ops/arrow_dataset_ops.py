@@ -541,7 +541,8 @@ class ArrowStreamDataset(ArrowBaseDataset):
 
         # Create a UDS server by default if not Windows
         if os.name != "nt":
-            sock_path = os.path.join(tempfile.gettempdir(), "arrow_io_stream.sock")
+            with tempfile.NamedTemporaryFile(suffix=".sock", delete=False) as f:
+                sock_path = f.name
             endpoint = f"unix://{sock_path}"
             try:
                 os.unlink(sock_path)

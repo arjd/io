@@ -836,6 +836,61 @@ class ArrowDatasetTest(ArrowTestBase):
 
         self.run_test_case(dataset, truth_data, batch_size=2)
 
+    def test_stream_from_batches(self):
+        """Test batching with one or more streamed datasets"""
+        import tensorflow_io.arrow as arrow_io
+
+        num_batches = 2
+        scalar_truth_data = TruthData(
+            self.scalar_data, self.scalar_dtypes, self.scalar_shapes
+        )
+        list_truth_data = TruthData(
+            self.list_data, self.list_dtypes, self.list_shapes
+        )
+
+        scalar_batch = self.make_record_batch(scalar_truth_data)
+        scalar_batches = [scalar_batch] * num_batches
+
+        list_batch = self.make_record_batch(list_truth_data)
+        list_batches = [list_batch] * num_batches
+
+        # test multiple datasets
+        scalar_dataset = arrow_io.ArrowStreamDataset.from_record_batches(
+            scalar_batches,
+            output_types=scalar_truth_data.output_types,
+            output_shapes=scalar_truth_data.output_shapes,
+        )
+        list_dataset = arrow_io.ArrowStreamDataset.from_record_batches(
+            list_batches,
+            output_types=list_truth_data.output_types,
+            output_shapes=list_truth_data.output_shapes,
+        )
+
+        self.run_test_case(scalar_dataset, scalar_truth_data)
+        self.run_test_case(list_dataset, list_truth_data)
+
+        # test stream is exhausted
+        with self.assertRaisesRegex(ValueError, ""):
+            self.run_test_case(list_dataset, list_truth_data)
+
+        # test multiple iterations
+        truth_data = TruthData(
+            self.scalar_data + self.list_data,
+            self.scalar_dtypes + self.list_dtypes,
+            self.scalar_shapes + self.list_shapes,
+        )
+
+        batch = self.make_record_batch(truth_data)
+
+        dataset = arrow_io.ArrowStreamDataset.from_record_batches(
+            batch,
+            truth_data.output_types,
+            truth_data.output_shapes,
+            record_batch_iter_factory=lambda: batch,
+        )
+        self.run_test_case(dataset, truth_data)
+        self.run_test_case(dataset, truth_data)
+
     def test_bool_array_type(self):
         """NOTE: need to test this separately because to_pandas fails with
         ArrowNotImplementedError: Not implemented type for list in
